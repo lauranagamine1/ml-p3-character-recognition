@@ -232,6 +232,13 @@ ipython_config.py
 # Ada Library Information
 *.ali
 
+# Compressed files
+*.zip
+*.7z
+*.tar
+*.gz
+*.tar.gz
+
 # Folders
 data/
 
