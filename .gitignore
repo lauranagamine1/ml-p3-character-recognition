@@ -234,3 +234,7 @@ ipython_config.py
 
 # Folders
 data/
+
+# Specific files
+emnist_train_features.npz
+emnist_test_features.npz
