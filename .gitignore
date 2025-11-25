@@ -245,4 +245,3 @@ data/
 # Specific files
 emnist_train_features.npz
 emnist_test_features.npz
-emnist_train_reduced.npz
