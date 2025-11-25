@@ -1,1 +1,1 @@
-emnist_train_reduced.npz filter=lfs diff=lfs merge=lfs -text
+preprocesamiento/output/emnist_train_reduced.npz filter=lfs diff=lfs merge=lfs -text
