@@ -306,17 +306,18 @@ class CharacterRecognizerGUI:
         # Convertir a escala de grises
         img_gray = ImageOps.grayscale(self.image)
 
-        # Invertir colores (fondo negro, trazo blanco)
-        img_inverted = ImageOps.invert(img_gray)
-
+        # NO invertir - el dataset EMNIST tiene fondo blanco y trazos negros
+        # que es exactamente lo que dibujamos en el canvas
         # Convertir a numpy array
-        img_array = np.array(img_inverted)
+        img_array = np.array(img_gray)
 
-        # Encontrar región con contenido
-        coords = cv2.findNonZero(img_array)
+        # Encontrar región con contenido (píxeles negros/oscuros < 255)
+        # Invertir temporalmente para encontrar el contenido dibujado
+        inverted_for_detection = 255 - img_array
+        coords = cv2.findNonZero(inverted_for_detection)
         if coords is None:
-            # Si no hay dibujo, retornar imagen vacía
-            return np.zeros((28, 28), dtype=np.uint8)
+            # Si no hay dibujo, retornar imagen vacía (fondo blanco)
+            return np.ones((28, 28), dtype=np.float32)
 
         x, y, w, h = cv2.boundingRect(coords)
 
@@ -330,9 +331,9 @@ class CharacterRecognizerGUI:
         # Recortar región de interés
         cropped = img_array[y : y + h, x : x + w]
 
-        # Hacer la imagen cuadrada
+        # Hacer la imagen cuadrada con fondo blanco
         max_dim = max(w, h)
-        square_img = np.zeros((max_dim, max_dim), dtype=np.uint8)
+        square_img = np.ones((max_dim, max_dim), dtype=np.uint8) * 255
 
         # Centrar la imagen
         y_offset = (max_dim - h) // 2
@@ -342,14 +343,10 @@ class CharacterRecognizerGUI:
         # Redimensionar a 28x28
         resized = cv2.resize(square_img, (28, 28), interpolation=cv2.INTER_AREA)
 
-        # Normalizar a [0, 1]
+        # Normalizar a [0, 1] - NO binarizar, mantener valores float
         normalized = resized.astype(np.float32) / 255.0
 
-        # Binarizar con umbral
-        threshold = 0.5
-        binarized = (normalized > threshold).astype(np.uint8)
-
-        return binarized
+        return normalized
 
     def classify(self):
         """Clasifica el carácter dibujado."""
@@ -400,7 +397,7 @@ class CharacterRecognizerGUI:
         Muestra la imagen procesada en el canvas.
 
         Args:
-            img: Imagen procesada de 28x28
+            img: Imagen procesada de 28x28 (valores float en [0, 1])
         """
         self.processed_canvas.delete("all")
 
@@ -408,14 +405,17 @@ class CharacterRecognizerGUI:
         scale = 5
         for i in range(28):
             for j in range(28):
-                if img[i, j] > 0:
-                    x1 = j * scale
-                    y1 = i * scale
-                    x2 = x1 + scale
-                    y2 = y1 + scale
-                    self.processed_canvas.create_rectangle(
-                        x1, y1, x2, y2, fill="black", outline=""
-                    )
+                # Convertir valor float [0, 1] a escala de grises
+                intensity = int(img[i, j] * 255)
+                gray_color = f"#{intensity:02x}{intensity:02x}{intensity:02x}"
+
+                x1 = j * scale
+                y1 = i * scale
+                x2 = x1 + scale
+                y2 = y1 + scale
+                self.processed_canvas.create_rectangle(
+                    x1, y1, x2, y2, fill=gray_color, outline=""
+                )
 
 
 def main():
