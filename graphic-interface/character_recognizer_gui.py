@@ -1,9 +1,9 @@
 """
 Interfaz Gráfica para Reconocimiento de Caracteres EMNIST
-usando Regresión Logística
+usando XGBoost
 
 Este módulo proporciona una interfaz gráfica interactiva donde el usuario
-puede dibujar caracteres y el modelo de regresión logística los clasificará.
+puede dibujar caracteres y el modelo de XGBoost los clasificará.
 """
 
 import pickle
@@ -14,6 +14,7 @@ from tkinter import messagebox, ttk
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
+from skimage.filters import threshold_otsu
 
 
 class CharacterRecognizerGUI:
@@ -21,7 +22,7 @@ class CharacterRecognizerGUI:
     Interfaz gráfica para reconocimiento de caracteres manuscritos.
 
     Permite al usuario dibujar en un canvas y clasificar el carácter
-    dibujado usando el modelo de regresión logística entrenado.
+    dibujado usando el modelo de XGBoost entrenado.
     """
 
     def __init__(self, root):
@@ -56,12 +57,12 @@ class CharacterRecognizerGUI:
 
     def load_model(self):
         """Carga el modelo entrenado y componentes de preprocesamiento."""
-        model_dir = Path("../classification/logistic-regression/output")
+        model_dir = Path("../classification/xgBoost/output")
         prepro_dir = Path("../preprocesamiento")
 
         try:
-            # Cargar modelo
-            with open(model_dir / "logistic_regression_model.pkl", "rb") as f:
+            # Cargar modelo XGBoost
+            with open(model_dir / "xgboost_model.pkl", "rb") as f:
                 self.model = pickle.load(f)
 
             # Cargar mapeo de clases
@@ -69,7 +70,7 @@ class CharacterRecognizerGUI:
                 self.class_mapping = pickle.load(f)
 
             # Cargar métricas
-            with open(model_dir / "metrics.pkl", "rb") as f:
+            with open(model_dir / "xgboost_metrics.pkl", "rb") as f:
                 self.metrics = pickle.load(f)
 
             # Cargar scaler y PCA del preprocesamiento
@@ -237,7 +238,7 @@ class CharacterRecognizerGUI:
         info_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky=(tk.W, tk.E))
 
         info_text = (
-            f"Modelo: Regresión Logística Multinomial  |  "
+            f"Modelo: XGBoost  |  "
             f"Accuracy: {self.metrics['test_accuracy'] * 100:.2f}%  |  "
             f"F1-Score: {self.metrics['test_f1']:.4f}  |  "
             f"Clases: 62 (0-9, A-Z, a-z)"
@@ -300,15 +301,19 @@ class CharacterRecognizerGUI:
         """
         Preprocesa la imagen dibujada para el modelo.
 
+        Aplica el MISMO preprocesamiento que el dataset de entrenamiento:
+        1. Conversión a escala de grises
+        2. Inversión de polaridad (fondo negro, letra blanca)
+        3. Normalización a [0, 1]
+        4. Binarización con umbral de Otsu
+
         Returns:
-            numpy.ndarray: Imagen procesada de 28x28
+            numpy.ndarray: Imagen procesada de 28x28 (valores 0 o 1)
         """
+        from skimage.filters import threshold_otsu
+
         # Convertir a escala de grises
         img_gray = ImageOps.grayscale(self.image)
-
-        # NO invertir - el dataset EMNIST tiene fondo blanco y trazos negros
-        # que es exactamente lo que dibujamos en el canvas
-        # Convertir a numpy array
         img_array = np.array(img_gray)
 
         # Encontrar región con contenido (píxeles negros/oscuros < 255)
@@ -316,8 +321,8 @@ class CharacterRecognizerGUI:
         inverted_for_detection = 255 - img_array
         coords = cv2.findNonZero(inverted_for_detection)
         if coords is None:
-            # Si no hay dibujo, retornar imagen vacía (fondo blanco)
-            return np.ones((28, 28), dtype=np.float32)
+            # Si no hay dibujo, retornar imagen vacía (todos ceros)
+            return np.zeros((28, 28), dtype=np.uint8)
 
         x, y, w, h = cv2.boundingRect(coords)
 
@@ -343,10 +348,18 @@ class CharacterRecognizerGUI:
         # Redimensionar a 28x28
         resized = cv2.resize(square_img, (28, 28), interpolation=cv2.INTER_AREA)
 
-        # Normalizar a [0, 1] - NO binarizar, mantener valores float
-        normalized = resized.astype(np.float32) / 255.0
+        # APLICAR EL MISMO PREPROCESAMIENTO QUE EL DATASET:
+        # 1. Invertir polaridad (fondo negro, letra blanca)
+        inverted = 255 - resized
 
-        return normalized
+        # 2. Normalizar a [0, 1]
+        normalized = inverted.astype(np.float32) / 255.0
+
+        # 3. Binarización con umbral de Otsu
+        thresh = threshold_otsu(normalized)
+        binarized = (normalized >= thresh).astype(np.uint8)
+
+        return binarized
 
     def classify(self):
         """Clasifica el carácter dibujado."""
