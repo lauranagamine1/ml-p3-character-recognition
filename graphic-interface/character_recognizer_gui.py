@@ -15,6 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
 from skimage.filters import threshold_otsu
+from ..preprocesamiento.FeatureExtractor import FeatureExtractor
 
 
 class CharacterRecognizerGUI:
@@ -73,24 +74,9 @@ class CharacterRecognizerGUI:
             with open(model_dir / "xgboost_metrics.pkl", "rb") as f:
                 self.metrics = pickle.load(f)
 
-            # Cargar scaler y PCA del preprocesamiento
-            # Necesitamos estos para transformar la imagen 784 -> 61 features
-            try:
-                with open(prepro_dir / "scaler.pkl", "rb") as f:
-                    self.scaler = pickle.load(f)
-                with open(prepro_dir / "pca.pkl", "rb") as f:
-                    self.pca = pickle.load(f)
-                print("✓ Scaler y PCA cargados desde preprocesamiento")
-            except FileNotFoundError:
-                print("⚠ No se encontraron scaler/pca en preprocesamiento")
-                print("  Creando transformadores básicos...")
-                # Si no existen, los creamos (no ideales pero funcionales)
-                from sklearn.decomposition import PCA
-                from sklearn.preprocessing import StandardScaler
-
-                self.scaler = StandardScaler()
-                self.pca = PCA(n_components=61)
-                # Nota: Estos no estarán entrenados, solo para compatibilidad
+            # Cargar pipeline de reducción de dimensionalidad
+            with open(prepro_dir / "dim_reduction_pipeline.pkl", "rb") as f:
+                self.dim_reduction = pickle.load(f)
 
             print("✓ Modelo y componentes cargados exitosamente")
 
@@ -379,14 +365,15 @@ class CharacterRecognizerGUI:
         # Aplanar imagen (28x28 -> 784)
         img_flat = processed_img.reshape(1, -1).astype(np.float64)
 
-        # Aplicar las transformaciones: Normalización -> PCA -> Predicción
-        # Esto reduce de 784 a 61 features como espera el modelo
-        img_scaled = self.scaler.transform(img_flat)
-        img_pca = self.pca.transform(img_scaled)
+        # Extraer features
+        img_features = FeatureExtractor().extract_features_img(img_flat)
+
+        # Reducir dimensionalidad
+        img_reduced = self.dim_reduction.transform(img_features)
 
         # Predecir (ahora con 61 features)
-        prediction = self.model.predict(img_pca)[0]
-        probabilities = self.model.predict_proba(img_pca)[0]
+        prediction = self.model.predict(img_reduced)[0]
+        probabilities = self.model.predict_proba(img_reduced)[0]
 
         # Obtener top 5 predicciones
         top5_indices = np.argsort(probabilities)[-5:][::-1]
