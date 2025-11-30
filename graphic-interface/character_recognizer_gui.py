@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
 from skimage.filters import threshold_otsu
-from ..preprocesamiento.FeatureExtractor import FeatureExtractor
+from FeatureExtractor import FeatureExtractor
 
 
 class CharacterRecognizerGUI:
