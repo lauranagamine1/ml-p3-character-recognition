@@ -40,7 +40,7 @@ class CharacterRecognizerGUI:
 
         # Configuración del canvas de dibujo
         self.canvas_size = 400
-        self.brush_size = 20
+        self.brush_size = 25
 
         # Variable para tracking del mouse
         self.last_x = None
@@ -334,14 +334,10 @@ class CharacterRecognizerGUI:
         # Redimensionar a 28x28
         resized = cv2.resize(square_img, (28, 28), interpolation=cv2.INTER_AREA)
 
-        # APLICAR EL MISMO PREPROCESAMIENTO QUE EL DATASET:
-        # 1. Invertir polaridad (fondo negro, letra blanca)
-        inverted = 255 - resized
+        # Normalizar a [0, 1] sobre la imagen invertida
+        normalized = resized.astype(np.float32) / 255.0
 
-        # 2. Normalizar a [0, 1]
-        normalized = inverted.astype(np.float32) / 255.0
-
-        # 3. Binarización con umbral de Otsu
+        # Binarización con umbral de Otsu
         thresh = threshold_otsu(normalized)
         binarized = (normalized >= thresh).astype(np.uint8)
 
@@ -362,11 +358,11 @@ class CharacterRecognizerGUI:
         # Mostrar imagen procesada
         self.show_processed_image(processed_img)
 
-        # Aplanar imagen (28x28 -> 784)
-        img_flat = processed_img.reshape(1, -1).astype(np.float64)
-
         # Extraer features
-        img_features = FeatureExtractor().extract_features_img(img_flat)
+        img_features = FeatureExtractor().extract_features_img(processed_img)
+
+        # El pipeline de reducción espera forma (n_samples, n_features)
+        img_features = img_features.reshape(1, -1)
 
         # Reducir dimensionalidad
         img_reduced = self.dim_reduction.transform(img_features)
