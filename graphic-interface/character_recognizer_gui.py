@@ -15,6 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
 from skimage.filters import threshold_otsu
+from ImageProcessor import ImageProcessor
 from FeatureExtractor import FeatureExtractor
 
 
@@ -283,70 +284,10 @@ class CharacterRecognizerGUI:
         self.top5_tree.delete(*self.top5_tree.get_children())
         self.processed_canvas.delete("all")
 
-    def preprocess_image(self):
-        """
-        Preprocesa la imagen dibujada para el modelo.
-
-        Aplica el MISMO preprocesamiento que el dataset de entrenamiento:
-        1. Conversión a escala de grises
-        2. Inversión de polaridad (fondo negro, letra blanca)
-        3. Normalización a [0, 1]
-        4. Binarización con umbral de Otsu
-
-        Returns:
-            numpy.ndarray: Imagen procesada de 28x28 (valores 0 o 1)
-        """
-        from skimage.filters import threshold_otsu
-
-        # Convertir a escala de grises
-        img_gray = ImageOps.grayscale(self.image)
-        img_array = np.array(img_gray)
-
-        # Encontrar región con contenido (píxeles negros/oscuros < 255)
-        # Invertir temporalmente para encontrar el contenido dibujado
-        inverted_for_detection = 255 - img_array
-        coords = cv2.findNonZero(inverted_for_detection)
-        if coords is None:
-            # Si no hay dibujo, retornar imagen vacía (todos ceros)
-            return np.zeros((28, 28), dtype=np.uint8)
-
-        x, y, w, h = cv2.boundingRect(coords)
-
-        # Agregar padding
-        padding = 20
-        x = max(0, x - padding)
-        y = max(0, y - padding)
-        w = min(img_array.shape[1] - x, w + 2 * padding)
-        h = min(img_array.shape[0] - y, h + 2 * padding)
-
-        # Recortar región de interés
-        cropped = img_array[y : y + h, x : x + w]
-
-        # Hacer la imagen cuadrada con fondo blanco
-        max_dim = max(w, h)
-        square_img = np.ones((max_dim, max_dim), dtype=np.uint8) * 255
-
-        # Centrar la imagen
-        y_offset = (max_dim - h) // 2
-        x_offset = (max_dim - w) // 2
-        square_img[y_offset : y_offset + h, x_offset : x_offset + w] = cropped
-
-        # Redimensionar a 28x28
-        resized = cv2.resize(square_img, (28, 28), interpolation=cv2.INTER_AREA)
-
-        # Normalizar a [0, 1] sobre la imagen invertida
-        normalized = resized.astype(np.float32) / 255.0
-
-        # Binarización con umbral de Otsu
-        thresh = threshold_otsu(normalized)
-        binarized = (normalized >= thresh).astype(np.uint8)
-
-        return binarized
-
     def classify(self):
         """Clasifica el carácter dibujado."""
         # Preprocesar imagen
-        processed_img = self.preprocess_image()
+        processed_img = ImageProcessor.process_img(self.image)
 
         # Verificar que hay algo dibujado
         if processed_img.sum() == 0:
