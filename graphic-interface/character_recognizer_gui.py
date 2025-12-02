@@ -36,8 +36,12 @@ class CharacterRecognizerGUI:
         """
         self.root = root
         self.root.title("Reconocedor de Caracteres EMNIST")
-        self.root.geometry("900x700")
-        self.root.resizable(False, False)
+        # Usar diseño responsivo en lugar de tamaño fijo
+        self.root.minsize(800, 600)
+        self.root.resizable(True, True)
+        # Pesos de grid para que el contenido se expanda
+        self.root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
 
         # Configuración del canvas de dibujo
         self.canvas_size = 400
@@ -97,7 +101,12 @@ class CharacterRecognizerGUI:
 
         # Frame principal
         main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame.grid(row=0, column=0, sticky="nsew")
+        # Permitir expansión de las filas/columnas principales
+        for c in (0, 1):
+            main_frame.columnconfigure(c, weight=1)
+        # Filas: título, subtítulo, contenido, info
+        main_frame.rowconfigure(2, weight=1)
 
         # Título
         title_label = ttk.Label(
@@ -117,7 +126,9 @@ class CharacterRecognizerGUI:
 
         # Frame izquierdo: Canvas de dibujo
         left_frame = ttk.LabelFrame(main_frame, text="Área de Dibujo", padding="10")
-        left_frame.grid(row=2, column=0, padx=10, pady=10, sticky=(tk.N, tk.S))
+        left_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        left_frame.rowconfigure(1, weight=1)  # canvas row
+        left_frame.columnconfigure(0, weight=1)
 
         # Canvas
         self.canvas = tk.Canvas(
@@ -127,7 +138,7 @@ class CharacterRecognizerGUI:
             bg="white",
             cursor="crosshair",
         )
-        self.canvas.pack()
+        self.canvas.pack(fill=tk.BOTH, expand=True)
 
         # Eventos del mouse
         self.canvas.bind("<Button-1>", self.start_draw)
@@ -173,11 +184,14 @@ class CharacterRecognizerGUI:
 
         # Frame derecho: Resultados
         right_frame = ttk.LabelFrame(main_frame, text="Resultados", padding="10")
-        right_frame.grid(row=2, column=1, padx=10, pady=10, sticky=(tk.N, tk.S))
+        right_frame.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+        for r in (0, 1, 2):
+            right_frame.rowconfigure(r, weight=1)
+        right_frame.columnconfigure(0, weight=1)
 
         # Resultado principal
         result_frame = ttk.Frame(right_frame)
-        result_frame.pack(pady=10)
+        result_frame.pack(pady=10, fill=tk.X)
 
         ttk.Label(result_frame, text="Predicción:", font=("Arial", 12)).pack()
         self.prediction_label = ttk.Label(
@@ -205,13 +219,13 @@ class CharacterRecognizerGUI:
         self.top5_tree.heading("Confianza", text="Confianza")
         self.top5_tree.column("Carácter", width=100, anchor=tk.CENTER)
         self.top5_tree.column("Confianza", width=100, anchor=tk.CENTER)
-        self.top5_tree.pack()
+        self.top5_tree.pack(fill=tk.BOTH, expand=True)
 
         # Imagen procesada
         processed_frame = ttk.LabelFrame(
             right_frame, text="Imagen Procesada (28x28)", padding="10"
         )
-        processed_frame.pack(pady=10)
+        processed_frame.pack(pady=10, fill=tk.X)
 
         self.processed_canvas = tk.Canvas(
             processed_frame, width=140, height=140, bg="white"
@@ -222,7 +236,7 @@ class CharacterRecognizerGUI:
         info_frame = ttk.LabelFrame(
             main_frame, text="Información del Modelo", padding="10"
         )
-        info_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky=(tk.W, tk.E))
+        info_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky="we")
 
         info_text = (
             f"Modelo: XGBoost  |  "
